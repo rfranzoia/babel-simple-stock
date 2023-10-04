@@ -1,0 +1,94 @@
+version: '3.8'
+services:
+
+  postgres-service:
+    container_name: postgres-service
+    image: postgres:15
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: simple_orders
+      POSTGRES_USER: simple
+      POSTGRES_PASSWORD: S1mpl30rd3r5P4ss
+    networks:
+      - simple-network
+
+  eureka-server:
+    build: ./eureka-server
+    container_name: eureka-server
+    networks:
+      - simple-network
+    expose:
+      - 8761
+    ports:
+      - 8761:8761
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    networks:
+      - simple-network
+    ports:
+      - 8080:8080
+    links:
+      - eureka-server
+  
+  item-service:
+    build: ./item-service
+    container_name: item-service
+    networks:
+      - simple-network
+    ports:
+      - 8081:8081
+    links:
+      - eureka-server
+      - postgres-service
+
+  user-service:
+    build: ./user-service
+    container_name: user-service
+    networks:
+      - simple-network
+    ports:
+      - 8082:8082
+    links:
+      - eureka-server
+      - postgres-service
+
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    networks:
+      - simple-network
+    ports:
+      - 8084:8084
+    links:
+      - eureka-server
+      - postgres-service
+
+  stock-movement-service:
+    build: ./stockmovement-service
+    container_name: stockmovement-service
+    networks:
+      - simple-network
+    ports:
+      - 8083:8083
+    links:
+      - eureka-server
+      - postgres-service
+
+  order-stock-movement-service:
+    build: ./order-stockmovement-service
+    container_name: order-stockmovement-service
+    networks:
+      - simple-network
+    ports:
+      - 8085:8085
+    links:
+      - eureka-server
+      - postgres-service
+
+networks:
+  simple-network:
+    driver: bridge
