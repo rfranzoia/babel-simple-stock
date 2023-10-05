@@ -10,6 +10,8 @@ A stock management application using latest SpringCloud features
 * Java 17
 * Swagger OpenAPI 3.0
 * Docker (for publishing)
+* Lombok
+* SL4J (from Lombok) for logging
 
 ## Running Instructions
 
@@ -36,11 +38,14 @@ A stock management application using latest SpringCloud features
 * Then you can create Orders or StockMovements in any order
   * creating an order will check if there's on or more StockMovement that can fulfill that order
   * creating a StockMovement will check if there's one or more Orders to fulfill
-* Everytime an order is fulfilled, the StockMovement used to do so is recorded with the
+* Everytime an order is (partialy) fulfilled, the StockMovement used to do so is recorded with the
   Order-StockMovement Service
 
 ## Latest Changes
 
+* Added Logging files for all services (except: api-gateway and eureka-server)
+  * The log files are created in the docker container. Use `docker-compose exec <service-name> bash` to enter
+    interactive mode and check the log file created (it has the name of the service ending witht he extension .log).
 * Added endpoint to list Orders by Status
 * Added "Send email to User after Order Completed" feature (NOT FULLY TEsTE, NEEDS PROPER EMAIL SMTP CONFIGURARION)
 
@@ -55,7 +60,7 @@ A stock management application using latest SpringCloud features
 * Same for StockMovement, CREATE will check Order but UPDATE/DELETE will not
 * It's only possible to DELETE Pending Orders
 * It's only possible to DELETE StockMovement with available quantities
-* Due to time constraints the Logging file is not present
+
 
 
 
