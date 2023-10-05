@@ -70,9 +70,8 @@ A stock management application using latest SpringCloud features
 
 
 
------------------------------------
-###### note from the developer: if you wish to see a more simpler version, 
-###### using Java 11, please contact me to request the access link
+----------------------------------------------------------------
+###### note from the developer: if you wish to see a simpler version, using Java 11, please contact me to request the access link
 
-==================================
+----------------------------------------------------------------
 ##### copyright(C) Romeu Franzoia - 2023
