@@ -6,6 +6,7 @@ import com.franzoia.common.exception.EntityNotFoundException;
 import com.franzoia.common.exception.InvalidRequestException;
 import com.franzoia.common.exception.ServiceNotAvailableException;
 import com.franzoia.common.util.DefaultService;
+import com.franzoia.common.util.ErrorResponse;
 import com.franzoia.orderservice.config.ItemFeignClient;
 import com.franzoia.orderservice.config.OrderStockMovementFeignClient;
 import com.franzoia.orderservice.config.StockMovementFeignClient;
@@ -16,6 +17,8 @@ import com.franzoia.orderservice.service.mapper.OrderMapper;
 import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -132,6 +135,18 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 
 			order = repository.save(order);
 
+			if (order.getStatus().equals(OrderStatus.completed)) {
+				final OrderDTO o = mapper.convertEntityToDTO(order);
+				new Thread(() -> {
+					try {
+						ResponseEntity<ErrorResponse> response = userFeignClient.sendOrderCompletedEmail(o.userId(), o);
+						log.info(response.getBody().toString());
+					} catch (EntityNotFoundException | MailException exception) {
+						log.error("Unable to send email to user: {}", exception.toString());
+					}
+				}).start();
+			}
+
 			var stockMovementUpdateRequest = StockMovementDTO.builder()
 					.quantityAvailable(stockMovementDTO.quantityAvailable() - quantityToTake)
 					.build();
@@ -190,6 +205,18 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 		// save the updated order
 		repository.save(order);
 
+		if (order.getStatus().equals(OrderStatus.completed)) {
+			final OrderDTO o = mapper.convertEntityToDTO(order);
+			new Thread(() -> {
+				try {
+					ResponseEntity<ErrorResponse> response = userFeignClient.sendOrderCompletedEmail(o.userId(), o);
+					log.info(response.getBody().toString());
+				} catch (EntityNotFoundException | MailException exception) {
+					log.error("Unable to send email to user: {}", exception.toString());
+				}
+			}).start();
+		}
+
 		return get(orderId);
 	}
 
@@ -223,10 +250,8 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 	 * @param itemId the ID of the item
 	 * @return List<Order> of Stock
 	 *
-	 * @throws EntityNotFoundException when the Item is not found
-	 * @throws ServiceNotAvailableException the Item-Service is not available to check to the item
 	 */
-	public List<OrderDTO> listByItem(final Long itemId) throws EntityNotFoundException, ServiceNotAvailableException {
+	public List<OrderDTO> listByItem(final Long itemId) {
 		// find all orders by item and return
 		return createOrderList(((OrderRepository) repository).findAllByItemIdOrderByCreationDate(itemId));
 	}
@@ -237,10 +262,8 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 	 * @param itemId the id of the item
 	 * @param status the status of the order
 	 * @return List<OrderDTO>
-	 * @throws ServiceNotAvailableException when the item-service is unavailable
-	 * @throws EntityNotFoundException then the item is not found
 	 */
-	public List<OrderDTO> listByItemAndStatus(final long itemId, final OrderStatus status) throws ServiceNotAvailableException, EntityNotFoundException {
+	public List<OrderDTO> listByItemAndStatus(final long itemId, final OrderStatus status) {
 		// find all orders by item and status
 		return createOrderList(((OrderRepository) repository).findAllByItemIdAndStatusOrderByCreationDate(itemId, status));
 	}
@@ -261,10 +284,8 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 	 * @param userId the ID of the user
 	 * @return List<Order> of Order
 	 *
-	 * @throws EntityNotFoundException when the User is not found
-	 * @throws ServiceNotAvailableException the User-Service is not available to check to the user
 	 */
-	public List<OrderDTO> listByUser(final Long userId) throws EntityNotFoundException, ServiceNotAvailableException {
+	public List<OrderDTO> listByUser(final Long userId) {
 		// find all orders by item and return them grouping by User
 		return createOrderList(((OrderRepository) repository).findAllByUserIdOrderByCreationDate(userId));
 	}

@@ -1,5 +1,7 @@
 package com.franzoia.userservice.controller;
 
+import com.franzoia.common.dto.OrderDTO;
+import com.franzoia.common.exception.InvalidRequestException;
 import com.franzoia.userservice.service.UserService;
 import com.franzoia.common.dto.UserDTO;
 import com.franzoia.common.exception.ConstraintsViolationException;
@@ -10,6 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Comparator;
@@ -49,7 +52,8 @@ public class UserController {
 	}
 
 	@DeleteMapping("/{userId}")
-	public ResponseEntity<ErrorResponse> deleteUser(@PathVariable final long userId) throws EntityNotFoundException, ServiceNotAvailableException {
+	public ResponseEntity<ErrorResponse> deleteUser(@PathVariable final long userId)
+			throws EntityNotFoundException {
 		usersService.delete(userId);
 		return new ResponseEntity<>(ErrorResponse.builder().message("User successfully deleted").build(), HttpStatus.ACCEPTED);
 	}
@@ -58,6 +62,13 @@ public class UserController {
 	public UserDTO update(@PathVariable final long userId, @RequestBody final UserDTO usersDTO)
 			throws EntityNotFoundException, ConstraintsViolationException {
 		return usersService.update(userId, usersDTO);
+	}
+
+	@PutMapping("/order-complete/email/{userId}")
+	ResponseEntity<ErrorResponse> sendOrderCompletedEmail(@PathVariable final Long userId, @RequestBody final OrderDTO order)
+			throws EntityNotFoundException, MailException {
+		usersService.sendOrderCompletedEmail(userId, order);
+		return new ResponseEntity<>(ErrorResponse.builder().message("Email sent to user").build(), HttpStatus.OK);
 	}
 
 }

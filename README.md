@@ -39,7 +39,12 @@ A stock management application using latest SpringCloud features
 * Everytime an order is fulfilled, the StockMovement used to do so is recorded with the
   Order-StockMovement Service
 
-## Missing features
+## Latest Changes
+
+* Added endpoint to list Orders by Status
+* Added "Send email to User after Order Completed" feature (NOT FULLY TEsTE, NEEDS PROPER EMAIL SMTP CONFIGURARION)
+
+## Missing details and features
 
 * All services support all CRUD operations, except the order-stock-movement-service, 
   which only have `create, delete, list by order and list by stock-movement`
