@@ -52,7 +52,7 @@ public class UserService extends DefaultService<UserDTO, User, Long, UserMapper>
 	 */
 	@Transactional
 	public UserDTO update(final Long userId, final UserDTO dto) throws EntityNotFoundException, ConstraintsViolationException {
-		log.info(String.format("update user %s", dto.toString()));
+		log.info("update user {}", dto);
 		User user = findByIdChecked(userId);
 		if (hasDuplicateName(dto.name(), user)) {
 			throw new ConstraintsViolationException("A user with the provided name already exists");
@@ -73,6 +73,7 @@ public class UserService extends DefaultService<UserDTO, User, Long, UserMapper>
 	 */
 	public void sendOrderCompletedEmail(final Long userId, final OrderDTO order)
 			throws EntityNotFoundException, MailException {
+		log.info("trying to send email to user {}", userId);
 		final User user = findByIdChecked(userId);
 		final String message = "Dear User \n " +
 				"\n" +

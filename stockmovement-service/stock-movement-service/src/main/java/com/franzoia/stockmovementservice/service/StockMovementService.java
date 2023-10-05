@@ -42,12 +42,15 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 	@Autowired
 	private OrderStockMovementFeignClient orderStockMovementFeignClient;
 
+	private Map<Long, List<ItemDTO>> itemsMap;
+
 	public StockMovementService(final StockMovementRepository stockmovementRepository) {
 		super(stockmovementRepository, new StockMovementMapper());
 	}
 
-	public StockMovementDTO get(final Long stock_movementId) throws EntityNotFoundException, ServiceNotAvailableException {
-		StockMovement stockmovement = findByIdChecked(stock_movementId);
+	public StockMovementDTO get(final Long stockMovementId) throws EntityNotFoundException, ServiceNotAvailableException {
+		log.info("Retrieving StockMovement {}", stockMovementId);
+		StockMovement stockmovement = findByIdChecked(stockMovementId);
 		ItemDTO item = getItemDTO(stockmovement.getItemId());
 		return StockMovementDTO.builder()
 				.id(stockmovement.getId())
@@ -72,6 +75,7 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 	 */
 	@Transactional
 	public StockMovementDTO create(StockMovementDTO dto) throws EntityNotFoundException, ConstraintsViolationException, ServiceNotAvailableException {
+		log.info("creating StockMovement {}", dto);
 		ItemDTO item = getItemDTO(dto.itemId());
 
 		StockMovement stockmovement = mapper.convertDtoToEntity(dto);
@@ -96,11 +100,12 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 
 	@Transactional
 	public void checkPendingOrders(StockMovement stockMovement) throws ServiceNotAvailableException, EntityNotFoundException, ConstraintsViolationException {
+		log.info("Checking pending Orders ...");
 		List<OrderDTO> pendingOrders = orderFeignClient.listByItemAndStatus(stockMovement.getItemId(), OrderStatus.pending);
 
 		// check all orders found trying to fulfill them
 		for (OrderDTO o : pendingOrders) {
-			log.warn("Pending order to Update: {}", o.toString());
+			log.warn("Updating pending Order: {}", o);
 			stockMovement = updateOrderAndStockMovement(stockMovement, o);
 
 			// leave the loop if the available quantity for this StockMovement is already depleted
@@ -112,7 +117,6 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 
 	@Transactional
 	public StockMovement updateOrderAndStockMovement(StockMovement stockMovement, OrderDTO o) throws ServiceNotAvailableException, EntityNotFoundException, ConstraintsViolationException {
-		log.info("updating order: {}", o);
 		long quantity;
 		long diff = o.quantityOrdered() - o.quantityFulfilled();
 
@@ -126,7 +130,7 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 				.quantityFulfilled(o.quantityFulfilled() + quantity)
 				.build();
 
-		log.info("order update request: {}", updateOrderRequest);
+		log.info("\tcreating order update request: {}", updateOrderRequest);
 		var updatedOrder = orderFeignClient.update(o.id(), updateOrderRequest);
 
 		stockMovement.setQuantityAvailable(stockMovement.getQuantityAvailable() - quantity);
@@ -138,7 +142,7 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 	}
 
 	public void addToTrace(OrderDTO orderDTO, StockMovementDTO stockMovementDTO, Long quantity) throws ConstraintsViolationException {
-		log.warn("Adding tracing for -> Order: {} | StockMovement: {} | Quantity: {}", orderDTO.id(), stockMovementDTO.id(), quantity);
+		log.warn("\tAdding tracing for -> Order: {} | StockMovement: {} | Quantity: {}", orderDTO.id(), stockMovementDTO.id(), quantity);
 		new Thread(() -> {
 			try {
 				OrderStockMovementKey key = new OrderStockMovementKey(orderDTO.id(), stockMovementDTO.id());
@@ -158,8 +162,9 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 	 * Update a stockmovement information.
 	 */
 	@Transactional
-	public StockMovementDTO update(final Long stock_movementId, final StockMovementDTO dto) throws EntityNotFoundException, ConstraintsViolationException, ServiceNotAvailableException {
-		StockMovement stockmovement = findByIdChecked(stock_movementId);
+	public StockMovementDTO update(final Long stockMovementId, final StockMovementDTO dto) throws EntityNotFoundException, ConstraintsViolationException, ServiceNotAvailableException {
+		log.info("Updating StockMovement {}{}", stockMovementId, dto);
+		StockMovement stockmovement = findByIdChecked(stockMovementId);
 
 		stockmovement.setItemId(dto.itemId() != null? dto.itemId(): stockmovement.getItemId());
 		stockmovement.setQuantityInformed(dto.quantityInformed() != null? dto.quantityInformed(): stockmovement.getQuantityInformed());
@@ -168,18 +173,19 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 
 		repository.save(stockmovement);
 
-		return get(stock_movementId);
+		return get(stockMovementId);
 	}
 
 	/**
 	 * delete an StockMovement by ID and update the Stock available to the item
 	 *
-	 * @param stock_movementId the id of the StockMovement
+	 * @param stockMovementId the id of the StockMovement
 	 * @throws EntityNotFoundException when the StockMovement is not found
 	 */
 	@Transactional
-	public void delete(final Long stock_movementId) throws EntityNotFoundException {
-		StockMovement sm = findByIdChecked(stock_movementId);
+	public void delete(final Long stockMovementId) throws EntityNotFoundException {
+		log.info("removing StockMovement {}", stockMovementId);
+		StockMovement sm = findByIdChecked(stockMovementId);
 		repository.delete(sm);
 	}
 
@@ -210,22 +216,28 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 	public List<StockMovementDTO> listByNonZeroQuantityAvailable() {
 		return createStockMovementList(((StockMovementRepository) repository).findAllByQuantityAvailableGreaterThan(0L), null);
 	}
-	private List<StockMovementDTO> createStockMovementList(final List<StockMovement> stock_movements, final ItemDTO item) {
-		Map<Long, List<ItemDTO>> itemMap = item == null? getItemMap(): null;
 
+	/**
+	 * common method to map List<Order> into List<OrderDTO>
+	 *
+	 * @param stockMovements List of StockMovement
+	 * @param item reference to ItemDTO (if available)
+	 * @return List of StockMovementDTO
+	 */
+	private List<StockMovementDTO> createStockMovementList(final List<StockMovement> stockMovements, final ItemDTO item) {
 		// fallback for item-service
 		final Function<Long, ItemDTO> itemFinder = id -> {
-			if (itemMap == null || itemMap.isEmpty() || !itemMap.containsKey(id)) {
+			if (getItemsMap().containsKey(id)) {
 				return ItemDTO.builder()
 						.name("Unavailable Item Data")
 						.build();
 			} else {
-				return itemMap.get(id).get(0);
+				return getItemsMap().get(id).get(0);
 			}
 		};
 
 		List<StockMovementDTO> list = new ArrayList<>();
-		stock_movements
+		stockMovements
 			.forEach(sm -> {
 				StockMovementDTO dto = StockMovementDTO.builder()
 						.id(sm.getId())
@@ -239,14 +251,20 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 		return list.stream().sorted(Comparator.comparing(StockMovementDTO::creationDate)).toList();
 	}
 
-	private Map<Long, List<ItemDTO>> getItemMap() {
-		try {
-			List<ItemDTO> items = itemFeignClient.listItems();
-			return items.stream().collect(groupingBy(ItemDTO::id));
-		} catch (Throwable fe) {
-			log.error("item-service status: {}", fe.getMessage());
-			return new TreeMap<>();
+	private Map<Long, List<ItemDTO>> getItemsMap() {
+		if (itemsMap == null || itemsMap.isEmpty()) {
+			new Thread(() -> {
+				synchronized (itemsMap) {
+					try {
+						itemsMap = itemFeignClient.listItems()
+								.stream().collect(groupingBy(ItemDTO::id));
+					} catch (Throwable fe) {
+						log.error("item-service status: {}", fe.getMessage());
+						itemsMap = new TreeMap<>();
+					}
+				}
+			}).start();
 		}
-
+		return itemsMap;
 	}
 }

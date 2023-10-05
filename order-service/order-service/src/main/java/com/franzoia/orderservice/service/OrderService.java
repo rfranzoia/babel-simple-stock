@@ -26,8 +26,10 @@ import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toMap;
 
 
 /**
@@ -54,8 +56,9 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 		super(orderRepository, new OrderMapper());
 	}
 
-	public OrderDTO get(final Long stock_movementId) throws EntityNotFoundException, ServiceNotAvailableException {
-		Order order = findByIdChecked(stock_movementId);
+	public OrderDTO get(final Long orderId) throws EntityNotFoundException, ServiceNotAvailableException {
+		log.info("retrieving order #{}", orderId);
+		Order order = findByIdChecked(orderId);
 		ItemDTO item = getItemDTO(order.getItemId());
 		UserDTO user = getUserDTO(order.getUserId());
 		return OrderDTO.builder()
@@ -92,6 +95,7 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 	 */
 	@Transactional
 	public OrderDTO create(OrderDTO dto) throws EntityNotFoundException, ConstraintsViolationException, ServiceNotAvailableException {
+		log.info("creating order {}", dto);
 		ItemDTO item = getItemDTO(dto.itemId());
 		UserDTO user = getUserDTO(dto.userId());
 
@@ -119,8 +123,10 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 
 	@Transactional
 	public Order tryToFulfillOrderAfterCreate(Order order) throws ServiceNotAvailableException, EntityNotFoundException, ConstraintsViolationException {
+		log.info("searching for available quantities in StockMovement");
 		List<StockMovementDTO> availableStockMovements = stockMovementFeignClient.listNonZeroQuantityAvailable();
 		for (StockMovementDTO stockMovementDTO : availableStockMovements) {
+			log.info("\tUpdating order {} with available quantity from {}", order, stockMovementDTO);
 			long quantityToTake;
 			if (stockMovementDTO.quantityAvailable() >= order.getQuantityOrdered()) {
 				quantityToTake = order.getQuantityOrdered();
@@ -136,6 +142,7 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 			order = repository.save(order);
 
 			if (order.getStatus().equals(OrderStatus.completed)) {
+				log.info("Order #{} is completed, sending email to user {}",order.getId(), order.getUserId());
 				final OrderDTO o = mapper.convertEntityToDTO(order);
 				new Thread(() -> {
 					try {
@@ -163,7 +170,7 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 	}
 
 	public void addToTrace(OrderDTO orderDTO, StockMovementDTO stockMovementDTO, Long quantity) throws ConstraintsViolationException {
-		log.warn("Adding tracing for -> Order:{} | StockMovement:{} | Quantity:{}", orderDTO.id(), stockMovementDTO.id(), quantity);
+		log.warn("\tAdding tracing for -> Order:{} | StockMovement:{} | Quantity:{}", orderDTO.id(), stockMovementDTO.id(), quantity);
 		new Thread(() -> {
 			try {
 				OrderStockMovementKey key = new OrderStockMovementKey(orderDTO.id(), stockMovementDTO.id());
@@ -183,6 +190,7 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 	 */
 	@Transactional
 	public OrderDTO update(final Long orderId, final OrderDTO dto) throws EntityNotFoundException, ServiceNotAvailableException {
+		log.info("updating order #{}{}",orderId, dto);
 		Order order = findByIdChecked(orderId);
 
 		if (order.getStatus().equals(OrderStatus.completed)) {
@@ -206,6 +214,7 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 		repository.save(order);
 
 		if (order.getStatus().equals(OrderStatus.completed)) {
+			log.info("Order #{} is completed, sending email to user {}",order.getId(), order.getUserId());
 			final OrderDTO o = mapper.convertEntityToDTO(order);
 			new Thread(() -> {
 				try {
@@ -223,12 +232,13 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 	/**
 	 * delete an Order by ID and update the Stock available to the item
 	 *
-	 * @param stock_movementId the id of the Order
+	 * @param orderId the id of the Order
 	 * @throws EntityNotFoundException when the Order is not found
 	 */
 	@Transactional
-	public void delete(final Long stock_movementId) throws EntityNotFoundException {
-		Order order = findByIdChecked(stock_movementId);
+	public void delete(final Long orderId) throws EntityNotFoundException {
+		log.info("removing order #{}", orderId);
+		Order order = findByIdChecked(orderId);
 
 		if (order.getStatus().equals(OrderStatus.completed)) {
 			throw new InvalidRequestException("Completed orders can't be deleted");
@@ -290,28 +300,28 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 		return createOrderList(((OrderRepository) repository).findAllByUserIdOrderByCreationDate(userId));
 	}
 
-	Map<Long, List<ItemDTO>> itemMap = null;
-	Map<Long, List<UserDTO>> userMap = null;
+	Map<Long, ItemDTO> itemsMap = null;
+	Map<Long, UserDTO> usersMap = null;
 
 	// fallback for item-service
 	final Function<Long, ItemDTO> itemFinder = id -> {
-		if (!getItemMap().containsKey(id)) {
+		if (!getItemsMap().containsKey(id)) {
 			return ItemDTO.builder()
 					.name("Unavailable Item Data")
 					.build();
 		} else {
-			return getItemMap().get(id).get(0);
+			return getItemsMap().get(id);
 		}
 	};
 
 	// fallback for user-service
 	final Function<Long, UserDTO> userFinder = id -> {
-		if (!getUserMap().containsKey(id)) {
+		if (!getUsersMap().containsKey(id)) {
 			return UserDTO.builder()
 					.name("Unavailable User Data")
 					.build();
 		} else {
-			return getUserMap().get(id).get(0);
+			return getUsersMap().get(id);
 		}
 	};
 
@@ -334,31 +344,39 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 		return list.stream().sorted(Comparator.comparing(OrderDTO::creationDate)).toList();
 	}
 
-
-
-	private Map<Long, List<ItemDTO>> getItemMap() {
-		try {
-			if (itemMap == null || itemMap.isEmpty()) {
-				List<ItemDTO> items = itemFeignClient.listItems();
-				itemMap = items.stream().collect(groupingBy(ItemDTO::id));
-			}
-			return itemMap;
-		} catch (Throwable fe) {
-			log.error("item-service status: {}", fe.getMessage());
-			return new TreeMap<>();
+	private Map<Long, ItemDTO> getItemsMap() {
+		if (itemsMap == null || itemsMap.isEmpty()) {
+			new Thread(() -> {
+				try {
+					itemsMap = itemFeignClient.listItems().stream()
+							.collect(groupingBy(ItemDTO::id))
+							.entrySet().stream()
+							.collect(toMap(Map.Entry::getKey, e -> e.getValue().get(0)));
+				} catch (Throwable fe) {
+					log.error("item-service status: {}", fe.getMessage());
+					itemsMap = new TreeMap<>();
+				}
+			}).start();
 		}
+		return itemsMap;
 	}
 	
-	private Map<Long, List<UserDTO>> getUserMap() {
-		try {
-			if (userMap == null || userMap.isEmpty()) {
-				List<UserDTO> users = userFeignClient.listUsers();
-				userMap = users.stream().collect(groupingBy(UserDTO::id));
-			}
-			return userMap;
-		} catch (Throwable fe) {
-			log.error("user-service status: {}", fe.getMessage());
-			return new TreeMap<>();
+	private Map<Long, UserDTO> getUsersMap() {
+		if (usersMap == null || usersMap.isEmpty()) {
+			new Thread(() -> {
+				try {
+					usersMap = userFeignClient.listUsers()
+							.stream()
+							.collect(groupingBy(UserDTO::id))
+							.entrySet().stream()
+							.collect(toMap(Map.Entry::getKey, e -> e.getValue().get(0)));
+
+				} catch (Throwable fe) {
+					log.error("user-service status: {}", fe.getMessage());
+					usersMap =  new TreeMap<>();
+				}
+			}).start();
 		}
+		return usersMap;
 	}
 }

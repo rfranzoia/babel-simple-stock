@@ -29,7 +29,7 @@ public class ItemService extends DefaultService<ItemDTO, Item, Long, ItemMapper>
 
 	@Transactional
 	public ItemDTO create(ItemDTO dto) throws ConstraintsViolationException {
-		log.info(String.format("create item %s", dto.toString()));
+		log.info("creating item {}", dto);
 		if (hasDuplicateName(dto.name(), null)) {
 			throw new ConstraintsViolationException("A item with the provided name already exists");
 		}
@@ -45,7 +45,7 @@ public class ItemService extends DefaultService<ItemDTO, Item, Long, ItemMapper>
 	 */
 	@Transactional
 	public ItemDTO update(final Long itemId, final ItemDTO dto) throws EntityNotFoundException, ConstraintsViolationException {
-		log.info(String.format("update item %s", dto.toString()));
+		log.info("creating item {}{}", itemId, dto);
 		Item item = findByIdChecked(itemId);
 		if (hasDuplicateName(dto.name(), item)) {
 			throw new ConstraintsViolationException("A item with the provided name already exists");

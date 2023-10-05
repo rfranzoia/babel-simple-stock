@@ -25,11 +25,18 @@ server:
 
 logging:
   level:
+    org.springframework: ERROR
+    com.franzoia: DEBUG
     io:
       swagger:
         models:
           parameters:
             AbstractSerializableParameter: ERROR
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"
+    file: "%d %p %c{1.} [%t] %m%n"
+  file:
+    name: item-service.log
 
 springdoc:
   api-docs:
