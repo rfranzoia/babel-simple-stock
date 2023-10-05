@@ -42,7 +42,7 @@ public class StockMovementService extends DefaultService<StockMovementDTO, Stock
 	@Autowired
 	private OrderStockMovementFeignClient orderStockMovementFeignClient;
 
-	private Map<Long, List<ItemDTO>> itemsMap;
+	private Map<Long, List<ItemDTO>> itemsMap = new TreeMap<>();
 
 	public StockMovementService(final StockMovementRepository stockmovementRepository) {
 		super(stockmovementRepository, new StockMovementMapper());
