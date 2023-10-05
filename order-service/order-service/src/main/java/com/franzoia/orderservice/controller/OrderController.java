@@ -106,6 +106,14 @@ public class OrderController {
 		return ordersService.listByItemAndStatus(itemId, status);
 	}
 
+	@Operation( summary = "List all Order by Status",
+			description = "List all Order that were created with the Status provided")
+	@ApiResponses({ @ApiResponse(responseCode = "200", description = "The Order List<Order>") })
+	@GetMapping("/item/{itemId}/status/{status}")
+	public List<OrderDTO> listByStatus(@PathVariable final OrderStatus status) throws EntityNotFoundException, ServiceNotAvailableException {
+		return ordersService.listByStatus(status);
+	}
+
 	
 	@Operation( summary = "List all Order by UserID",
 				description = "List all Order that were created with the User (ID) provided")

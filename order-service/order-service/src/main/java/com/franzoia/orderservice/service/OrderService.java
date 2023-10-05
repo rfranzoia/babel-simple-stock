@@ -239,6 +239,16 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 		return createOrderList(((OrderRepository) repository).findAllByItemIdAndStatusOrderByCreationDate(itemId, status));
 	}
 
+	/**
+	 * List all orders with the Status
+	 *
+	 * @param status the status of the order
+	 * @return List<OrderDTO>
+	 */
+	public List<OrderDTO> listByStatus(final OrderStatus status) {
+		return createOrderList(((OrderRepository) repository).findAllByStatusOrderByCreationDate(status));
+	}
+
 		/**
 	 * List all Order for a specific User
 	 *

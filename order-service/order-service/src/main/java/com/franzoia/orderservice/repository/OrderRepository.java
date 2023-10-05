@@ -14,6 +14,8 @@ public interface OrderRepository extends CrudRepository<Order, Long> {
 
     List<Order> findAllByItemIdAndStatusOrderByCreationDate(final Long itemId, final OrderStatus status);
 
+    List<Order> findAllByStatusOrderByCreationDate(final OrderStatus status);
+
     List<Order> findAllByUserIdOrderByCreationDate(final Long itemId);
 
 }
