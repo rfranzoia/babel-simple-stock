@@ -148,13 +148,19 @@ public class OrderService extends DefaultService<OrderDTO, Order, Long, OrderMap
 	}
 
 	public void addToTrace(OrderDTO orderDTO, StockMovementDTO stockMovementDTO, Long quantity) throws ConstraintsViolationException {
-		log.warn("Order: {} | StockMovement: {} | Quantity: {}", orderDTO.id(), stockMovementDTO.id(), quantity);
-		OrderStockMovementKey key = new OrderStockMovementKey(orderDTO.id(), stockMovementDTO.id());
-		orderStockMovementFeignClient
-				.createOrderStockMovement(OrderStockMovementDTO.builder()
-						.key(key)
-						.quantityUsed(quantity)
-						.build());
+		log.warn("Adding tracing for -> Order:{} | StockMovement:{} | Quantity:{}", orderDTO.id(), stockMovementDTO.id(), quantity);
+		new Thread(() -> {
+			try {
+				OrderStockMovementKey key = new OrderStockMovementKey(orderDTO.id(), stockMovementDTO.id());
+				orderStockMovementFeignClient
+						.createOrderStockMovement(OrderStockMovementDTO.builder()
+								.key(key)
+								.quantityUsed(quantity)
+								.build());
+			} catch (ConstraintsViolationException exception) {
+				log.error("Unable to add tracing, cause: {}", exception.toString());
+			}
+		}).start();
 	}
 
 	/**
