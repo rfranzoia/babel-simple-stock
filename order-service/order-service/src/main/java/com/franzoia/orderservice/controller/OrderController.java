@@ -109,7 +109,7 @@ public class OrderController {
 	@Operation( summary = "List all Order by Status",
 			description = "List all Order that were created with the Status provided")
 	@ApiResponses({ @ApiResponse(responseCode = "200", description = "The Order List<Order>") })
-	@GetMapping("/item/{itemId}/status/{status}")
+	@GetMapping("/status/{status}")
 	public List<OrderDTO> listByStatus(@PathVariable final OrderStatus status) throws EntityNotFoundException, ServiceNotAvailableException {
 		return ordersService.listByStatus(status);
 	}
