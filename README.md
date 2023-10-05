@@ -1,8 +1,9 @@
-# Simple Stock Management
+# Simple Order and Stock Management
 A stock management application using latest SpringCloud features
 
 ## Uses
 * Spring Boot 3.1.4
+* Spring Mail
 * Spring Cloud 2022.0.0
     - Netflix Eureka
     - OpenFeign
@@ -34,12 +35,15 @@ A stock management application using latest SpringCloud features
 
 ## Usage instructions
 
-* Create the Items and Users first, since they don't depend on anything else
+* Use the Postman collection provided to test the application
+* Create the Items and Users first, since they don't depend on anything else (all fields are required on those)
 * Then you can create Orders or StockMovements in any order
   * creating an order will check if there's on or more StockMovement that can fulfill that order
   * creating a StockMovement will check if there's one or more Orders to fulfill
 * Everytime an order is (partialy) fulfilled, the StockMovement used to do so is recorded with the
   Order-StockMovement Service
+* Use the endpoint List By Status on the Orders Service to check if Orders are completed or pending
+* Use the endpoint List By Order (or By Item) to check the tracing of Order/StockMovement
 
 ## Latest Changes
 
@@ -47,7 +51,10 @@ A stock management application using latest SpringCloud features
   * The log files are created in the docker container. Use `docker-compose exec <service-name> bash` to enter
     interactive mode and check the log file created (it has the name of the service ending witht he extension .log).
 * Added endpoint to list Orders by Status
-* Added "Send email to User after Order Completed" feature (NOT FULLY TEsTE, NEEDS PROPER EMAIL SMTP CONFIGURARION)
+* Added "Send email to User after Order Completed" feature
+  * A SMTP server must be chosen before using this feature
+  * Some tests were made but, to fully work, it's needed a configuration on the SMTP server
+  * As it is now, the application will try to send an email but it will show an ERROR on the log
 
 ## Missing details and features
 
@@ -63,5 +70,5 @@ A stock management application using latest SpringCloud features
 
 
 
-
+###### note from the developer: if you wish to see a more simpler version, using Java 11, please contact me to request the access link
 ##### copyright(C) Romeu Franzoia - 2023
